@@ -1,0 +1,154 @@
+// Prisma schema for College Discovery Platform MVP
+// Production-ready types, relations, and indexes for fast searches.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+// Enum for competitive exams
+enum Exam {
+  JEE_MAINS
+  JEE_ADV
+  NEET
+  GATE
+  UGC_NET
+  CUET
+  OTHER
+}
+
+// Standardized category for admissions (General/OBC/SC/ST/EWS)
+enum Category {
+  GENERAL
+  OBC
+  SC
+  ST
+  EWS
+  OTHER
+}
+
+model User {
+  id             String   @id @default(cuid())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  email          String   @unique
+  name           String?
+  role           String   @default("student")
+  savedColleges  SavedCollege[]
+  reviews        Review[]
+}
+
+model College {
+  id               String         @id @default(cuid())
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  name             String
+  slug             String         @unique
+  description      String?
+  city             String
+  state            String
+  country          String         @default("India")
+  locationLat      Float?
+  locationLng      Float?
+  establishedYear  Int?
+  website          String?
+  email            String?
+  phone            String?
+  ratingAverage    Float          @default(0)
+  ratingCount      Int            @default(0)
+  feesCurrency     String         @default("INR")
+  feesMin          Int?
+  feesMax          Int?
+  courses          Course[]
+  placementStats   PlacementStat[]
+  reviews          Review[]
+  cutOffs          CutOffRequirement[]
+  savedByUsers     SavedCollege[]
+
+  @@index([name])
+  @@index([city, state])
+}
+
+model Course {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  college       College  @relation(fields: [collegeId], references: [id])
+  collegeId     String
+  name          String
+  degree        String
+  durationMonths Int
+  eligibility   String?
+  feesAnnual    Int?
+  seats         Int?
+
+  @@index([name])
+  @@index([degree])
+}
+
+model PlacementStat {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+  year          Int
+  college       College  @relation(fields: [collegeId], references: [id])
+  collegeId     String
+  avgPackage    Float
+  medianPackage Float?
+  highestPackage Float?
+  placedCount   Int
+  totalStudents Int
+
+  @@index([year])
+  @@index([collegeId, year])
+}
+
+model Review {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+  college    College  @relation(fields: [collegeId], references: [id])
+  collegeId  String
+  rating     Int      @default(5)
+  title      String?
+  content    String
+  verified   Boolean  @default(false)
+
+  @@index([collegeId])
+  @@index([userId])
+}
+
+model CutOffRequirement {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+  college       College  @relation(fields: [collegeId], references: [id])
+  collegeId     String
+  exam          String
+  category      String
+  year          Int
+  round         Int?
+  openingRank    Int?
+  closingRank    Int?
+  openingPercentile Float?
+  closingPercentile Float?
+  seats         Int?
+  quota         String?
+
+  @@index([exam, category, year])
+  @@index([collegeId, exam, year])
+}
+
+model SavedCollege {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  college   College  @relation(fields: [collegeId], references: [id])
+  collegeId String
+
+  @@unique([userId, collegeId])
+}
