@@ -101,8 +101,21 @@ async function main() {
   ];
 
   for (const c of colleges) {
-    const college = await prisma.college.create({
-      data: {
+    // Upsert college by slug so repeated runs don't duplicate
+    const college = await prisma.college.upsert({
+      where: { slug: c.slug },
+      update: {
+        name: c.name,
+        description: c.description,
+        city: c.city,
+        state: c.state,
+        establishedYear: c.establishedYear,
+        website: c.website,
+        feesMin: c.feesMin,
+        feesMax: c.feesMax,
+        ratingAverage: c.ratingAverage,
+      },
+      create: {
         name: c.name,
         slug: c.slug,
         description: c.description,
@@ -116,75 +129,81 @@ async function main() {
       },
     });
 
-    // Add representative courses
-    await prisma.course.createMany({
-      data: [
-        {
-          collegeId: college.id,
-          name: "Computer Science and Engineering",
-          degree: "B.Tech",
-          durationMonths: 48,
-          feesAnnual: Math.round((c.feesMin + c.feesMax) / 2),
-          seats: 120,
-        },
-        {
-          collegeId: college.id,
-          name: "Mechanical Engineering",
-          degree: "B.Tech",
-          durationMonths: 48,
-          feesAnnual: Math.round((c.feesMin + c.feesMax) / 2),
-          seats: 60,
-        },
-        {
-          collegeId: college.id,
-          name: "Data Science (M.Sc)",
-          degree: "M.Sc",
-          durationMonths: 24,
-          feesAnnual: Math.round((c.feesMin + c.feesMax) / 3),
-          seats: 30,
-        },
-      ],
-    });
+    // Only create courses if none exist for this college (idempotent)
+    const existingCourse = await prisma.course.findFirst({ where: { collegeId: college.id } });
+    if (!existingCourse) {
+      await prisma.course.createMany({
+        data: [
+          {
+            collegeId: college.id,
+            name: "Computer Science and Engineering",
+            degree: "B.Tech",
+            durationMonths: 48,
+            feesAnnual: Math.round((c.feesMin + c.feesMax) / 2),
+            seats: 120,
+          },
+          {
+            collegeId: college.id,
+            name: "Mechanical Engineering",
+            degree: "B.Tech",
+            durationMonths: 48,
+            feesAnnual: Math.round((c.feesMin + c.feesMax) / 2),
+            seats: 60,
+          },
+          {
+            collegeId: college.id,
+            name: "Data Science (M.Sc)",
+            degree: "M.Sc",
+            durationMonths: 24,
+            feesAnnual: Math.round((c.feesMin + c.feesMax) / 3),
+            seats: 30,
+          },
+        ],
+      });
+    }
 
-    // Add placement stats for last 3 years (realistic ranges)
-    await prisma.placementStat.createMany({
-      data: [
-        {
-          collegeId: college.id,
-          year: 2023,
-          avgPackage: parseFloat((Math.random() * 4 + 4).toFixed(2)),
-          medianPackage: parseFloat((Math.random() * 3 + 3.5).toFixed(2)),
-          highestPackage: parseFloat((Math.random() * 40 + 12).toFixed(2)),
-          placedCount: Math.floor(Math.random() * 700 + 100),
-          totalStudents: Math.floor(Math.random() * 900 + 200),
-        },
-        {
-          collegeId: college.id,
-          year: 2022,
-          avgPackage: parseFloat((Math.random() * 3.5 + 3.8).toFixed(2)),
-          medianPackage: parseFloat((Math.random() * 2.5 + 3.0).toFixed(2)),
-          highestPackage: parseFloat((Math.random() * 35 + 10).toFixed(2)),
-          placedCount: Math.floor(Math.random() * 700 + 80),
-          totalStudents: Math.floor(Math.random() * 900 + 180),
-        },
-        {
-          collegeId: college.id,
-          year: 2021,
-          avgPackage: parseFloat((Math.random() * 3 + 3.2).toFixed(2)),
-          medianPackage: parseFloat((Math.random() * 2 + 2.8).toFixed(2)),
-          highestPackage: parseFloat((Math.random() * 30 + 9).toFixed(2)),
-          placedCount: Math.floor(Math.random() * 700 + 60),
-          totalStudents: Math.floor(Math.random() * 900 + 160),
-        },
-      ],
-    });
+    // Only add placement stats if none exist for this college
+    const existingPlacement = await prisma.placementStat.findFirst({ where: { collegeId: college.id } });
+    if (!existingPlacement) {
+      await prisma.placementStat.createMany({
+        data: [
+          {
+            collegeId: college.id,
+            year: 2023,
+            avgPackage: parseFloat((Math.random() * 4 + 4).toFixed(2)),
+            medianPackage: parseFloat((Math.random() * 3 + 3.5).toFixed(2)),
+            highestPackage: parseFloat((Math.random() * 40 + 12).toFixed(2)),
+            placedCount: Math.floor(Math.random() * 700 + 100),
+            totalStudents: Math.floor(Math.random() * 900 + 200),
+          },
+          {
+            collegeId: college.id,
+            year: 2022,
+            avgPackage: parseFloat((Math.random() * 3.5 + 3.8).toFixed(2)),
+            medianPackage: parseFloat((Math.random() * 2.5 + 3.0).toFixed(2)),
+            highestPackage: parseFloat((Math.random() * 35 + 10).toFixed(2)),
+            placedCount: Math.floor(Math.random() * 700 + 80),
+            totalStudents: Math.floor(Math.random() * 900 + 180),
+          },
+          {
+            collegeId: college.id,
+            year: 2021,
+            avgPackage: parseFloat((Math.random() * 3 + 3.2).toFixed(2)),
+            medianPackage: parseFloat((Math.random() * 2 + 2.8).toFixed(2)),
+            highestPackage: parseFloat((Math.random() * 30 + 9).toFixed(2)),
+            placedCount: Math.floor(Math.random() * 700 + 60),
+            totalStudents: Math.floor(Math.random() * 900 + 160),
+          },
+        ],
+      });
+    }
 
     // Add multiple cutoffs (JEE_MAINS, NEET, GATE, CUET) with category variants
     const cutoffs = [
       // JEE_MAINS general
       {
-        exam: "JEE_MAINS" as any,
-        category: "GENERAL" as any,
+        exam: "JEE_MAINS",
+        category: "GENERAL",
         year: 2023,
         round: 1,
         openingRank: Math.floor(Math.random() * 800 + 200),
@@ -195,8 +214,8 @@ async function main() {
       },
       // JEE_MAINS OBC
       {
-        exam: "JEE_MAINS" as any,
-        category: "OBC" as any,
+        exam: "JEE_MAINS",
+        category: "OBC",
         year: 2023,
         round: 1,
         openingRank: Math.floor(Math.random() * 900 + 300),
@@ -207,8 +226,8 @@ async function main() {
       },
       // NEET - for medical colleges
       {
-        exam: "NEET" as any,
-        category: "GENERAL" as any,
+        exam: "NEET",
+        category: "GENERAL",
         year: 2023,
         round: 1,
         openingRank: Math.floor(Math.random() * 200 + 1),
@@ -219,8 +238,8 @@ async function main() {
       },
       // GATE - postgrad engineering
       {
-        exam: "GATE" as any,
-        category: "GENERAL" as any,
+        exam: "GATE",
+        category: "GENERAL",
         year: 2023,
         round: 1,
         openingRank: Math.floor(Math.random() * 1000 + 50),
@@ -231,57 +250,68 @@ async function main() {
       },
     ];
 
-    const cutoffData = cutoffs.map((co) => ({
-      collegeId: college.id,
-      exam: co.exam,
-      category: co.category,
-      year: co.year,
-      round: co.round,
-      openingRank: co.openingRank,
-      closingRank: co.closingRank,
-      openingPercentile: co.openingPercentile,
-      closingPercentile: co.closingPercentile,
-      seats: co.seats,
-    }));
-
-    await prisma.cutOffRequirement.createMany({ data: cutoffData });
-
-    // Create a verified review and a user for it
-    const user = await prisma.user.create({
-      data: {
-        email: `${college.slug}.student1@example.com`,
-        name: `${college.name} Alumni`,
-        role: "student",
-      },
-    });
-
-    await prisma.review.create({
-      data: {
-        userId: user.id,
+    const existingCutoff = await prisma.cutOffRequirement.findFirst({ where: { collegeId: college.id } });
+    if (!existingCutoff) {
+      const cutoffData = cutoffs.map((co) => ({
         collegeId: college.id,
-        rating: Math.floor(Math.random() * 2) + 4,
-        title: "Good academics and placements",
-        content:
-          "Overall strong program, internships are plentiful and faculty are supportive. Campus life is active.",
-        verified: true,
-      },
-    });
+        exam: co.exam,
+        category: co.category,
+        year: co.year,
+        round: co.round,
+        openingRank: co.openingRank,
+        closingRank: co.closingRank,
+        openingPercentile: co.openingPercentile,
+        closingPercentile: co.closingPercentile,
+        seats: co.seats,
+      }));
+
+      await prisma.cutOffRequirement.createMany({ data: cutoffData });
+    }
+
+    // Create a verified review and a user for it (idempotent by email)
+    const [user] = await Promise.all([
+      prisma.user.upsert({
+        where: { email: `${c.slug}.student1@example.com` },
+        update: { name: `${c.name} Alumni`, role: "student" },
+        create: { email: `${c.slug}.student1@example.com`, name: `${c.name} Alumni`, role: "student" },
+      }),
+    ]);
+
+    const existingReview = await prisma.review.findFirst({ where: { userId: user.id, collegeId: college.id } });
+    if (!existingReview) {
+      await prisma.review.create({
+        data: {
+          userId: user.id,
+          collegeId: college.id,
+          rating: Math.floor(Math.random() * 2) + 4,
+          title: "Good academics and placements",
+          content:
+            "Overall strong program, internships are plentiful and faculty are supportive. Campus life is active.",
+          verified: true,
+        },
+      });
+    }
   }
 
   // Create a sample user who saves a few colleges
-  const sampleUser = await prisma.user.create({
-    data: {
-      email: "student.user@example.com",
-      name: "Sample Student",
-      role: "student",
-      savedColleges: {
-        create: [
-          { college: { connect: { slug: "bharati-institute-of-technology" } } },
-          { college: { connect: { slug: "northern-college-of-science" } } },
-        ],
-      },
-    },
+  // Ensure sample user exists and saved colleges are connected idempotently
+  const sampleUser = await prisma.user.upsert({
+    where: { email: "student.user@example.com" },
+    update: { name: "Sample Student", role: "student" },
+    create: { email: "student.user@example.com", name: "Sample Student", role: "student" },
   });
+
+  // Connect saved colleges if not already connected
+  const savedCollegeSlugs = ["bharati-institute-of-technology", "northern-college-of-science"];
+  for (const slug of savedCollegeSlugs) {
+    const col = await prisma.college.findUnique({ where: { slug } });
+    if (col) {
+      const exists = await prisma.savedCollege.findFirst({ where: { userId: sampleUser.id, collegeId: col.id } });
+      if (!exists) {
+        await prisma.savedCollege.create({ data: { userId: sampleUser.id, collegeId: col.id } });
+      }
+    }
+  }
 
   console.log("Seed complete.");
 }
